@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chalkboard Digit Lab</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --board:        #1c3329;
+    --board-edge:   #16281f;
+    --frame:        #4a3423;
+    --frame-dark:   #33230f;
+    --chalk-white:  #f3f0e6;
+    --chalk-yellow: #eec969;
+    --chalk-red:    #e08477;
+    --chalk-blue:   #7fb2bd;
+    --chalk-dim:    rgba(243,240,230,0.38);
+    --dust:         rgba(243,240,230,0.07);
+    --ink-shadow:   rgba(0,0,0,0.45);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 20% -10%, rgba(255,255,255,0.05), transparent 40%),
+      var(--board-edge);
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--chalk-white);
+    display:flex;
+    justify-content:center;
+    padding:36px 18px 60px;
+  }
+
+  .wrap{ width:100%; max-width:980px; }
+
+  header{ text-align:center; margin-bottom:28px; }
+
+  header .eyebrow{
+    font-size:12px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--chalk-dim);
+  }
+
+  h1{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:52px;
+    margin:6px 0 4px;
+    color:var(--chalk-white);
+    text-shadow: 0 0 14px rgba(243,240,230,0.12);
+    transform: rotate(-0.6deg);
+  }
+
+  header p{
+    margin:0;
+    color:var(--chalk-dim);
+    font-size:13.5px;
+  }
+
+  .desk{
+    display:grid;
+    grid-template-columns: 360px 1fr;
+    gap:26px;
+    align-items:start;
+  }
+
+  @media (max-width: 760px){
+    .desk{ grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Chalkboard + frame ---------- */
+
+  .board-frame{
+    background:
+      linear-gradient(160deg, var(--frame) 0%, var(--frame-dark) 100%);
+    border-radius:10px;
+    padding:14px;
+    box-shadow: 0 18px 40px var(--ink-shadow), inset 0 0 0 1px rgba(0,0,0,0.3);
+    position:relative;
+  }
+
+  .board-frame::after{
+    content:"";
+    position:absolute; inset:6px;
+    border-radius:6px;
+    border:1px dashed rgba(243,240,230,0.06);
+    pointer-events:none;
+  }
+
+  .board-inner{
+    background:
+      radial-gradient(circle at 30% 20%, var(--dust), transparent 60%),
+      radial-gradient(circle at 80% 85%, var(--dust), transparent 55%),
+      var(--board);
+    border-radius:4px;
+    padding:16px;
+  }
+
+  #canvas{
+    display:block;
+    width:100%;
+    aspect-ratio:1/1;
+    background:transparent;
+    border-radius:3px;
+    cursor:crosshair;
+    touch-action:none;
+  }
+
+  .board-caption{
+    margin-top:10px;
+    text-align:center;
+    font-family:'Caveat', cursive;
+    font-size:19px;
+    color:var(--chalk-dim);
+  }
+
+  .tools{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-top:16px;
+    padding:0 2px;
+  }
+
+  .chalk-slider{ flex:1; display:flex; align-items:center; gap:8px; }
+
+  .chalk-slider label{ font-size:11px; color:var(--chalk-dim); white-space:nowrap; }
+
+  input[type="range"]{
+    -webkit-appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:2px;
+    background:rgba(243,240,230,0.18);
+    outline:none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--chalk-yellow);
+    cursor:pointer;
+    box-shadow:0 0 6px rgba(238,201,105,0.6);
+  }
+
+  .btn-row{ display:flex; gap:10px; margin-top:14px; }
+
+  button{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    font-weight:500;
+    letter-spacing:.03em;
+    padding:11px 16px;
+    border-radius:5px;
+    border:1px solid rgba(243,240,230,0.2);
+    background:transparent;
+    color:var(--chalk-white);
+    cursor:pointer;
+    transition: background .15s ease, transform .1s ease, border-color .15s ease;
+    flex:1;
+  }
+
+  button:hover{ background:rgba(243,240,230,0.08); }
+  button:active{ transform:scale(0.97); }
+  button:focus-visible{ outline:2px solid var(--chalk-yellow); outline-offset:2px; }
+
+  button.primary{
+    background:rgba(238,201,105,0.12);
+    border-color:rgba(238,201,105,0.5);
+    color:var(--chalk-yellow);
+  }
+  button.primary:hover{ background:rgba(238,201,105,0.2); }
+
+  button:disabled{ opacity:.45; cursor:not-allowed; transform:none; }
+
+  /* ---------- Report card ---------- */
+
+  .card{
+    background:linear-gradient(180deg, rgba(243,240,230,0.04), rgba(243,240,230,0.015));
+    border:1px solid rgba(243,240,230,0.1);
+    border-radius:8px;
+    padding:22px 24px;
+    min-height:320px;
+  }
+
+  .card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px dashed rgba(243,240,230,0.14);
+    padding-bottom:12px;
+    margin-bottom:18px;
+  }
+
+  .card-head h2{
+    font-family:'Caveat', cursive;
+    font-size:26px;
+    margin:0;
+    font-weight:700;
+  }
+
+  .status{
+    display:flex; align-items:center; gap:7px;
+    font-size:11px;
+    color:var(--chalk-dim);
+    letter-spacing:.05em;
+  }
+
+  .status .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--chalk-red);
+    box-shadow:0 0 6px var(--chalk-red);
+    transition: background .2s ease, box-shadow .2s ease;
+  }
+  .status.online .dot{ background:#8bd39a; box-shadow:0 0 6px #8bd39a; }
+  .status.checking .dot{ background:var(--chalk-yellow); box-shadow:0 0 6px var(--chalk-yellow); }
+
+  .verdict{
+    display:flex;
+    align-items:center;
+    gap:22px;
+    margin-bottom:20px;
+    min-height:104px;
+  }
+
+  .verdict-digit{
+    font-family:'Caveat', cursive;
+    font-size:96px;
+    font-weight:700;
+    line-height:1;
+    color:var(--chalk-white);
+    width:100px;
+    text-align:center;
+    opacity:0;
+    transform:scale(0.7) rotate(-4deg);
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .verdict-digit.show{ opacity:1; transform:scale(1) rotate(-2deg); }
+
+  .verdict-meta{ flex:1; }
+
+  .verdict-meta .label{
+    font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--chalk-dim); margin-bottom:6px;
+  }
+
+  .confidence-track{
+    height:8px; border-radius:4px;
+    background:rgba(243,240,230,0.1);
+    overflow:hidden;
+    margin-bottom:6px;
+  }
+  .confidence-fill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg, var(--chalk-blue), var(--chalk-yellow));
+    border-radius:4px;
+    transition: width .5s ease;
+  }
+
+  .confidence-pct{ font-size:13px; color:var(--chalk-white); }
+
+  .placeholder{
+    color:var(--chalk-dim);
+    font-family:'Caveat', cursive;
+    font-size:20px;
+  }
+
+  .distribution{ margin-top:6px; }
+
+  .distribution .label{
+    font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--chalk-dim); margin-bottom:10px;
+  }
+
+  .dist-row{
+    display:grid;
+    grid-template-columns: 18px 1fr 42px;
+    align-items:center;
+    gap:10px;
+    margin-bottom:6px;
+    font-size:12px;
+  }
+
+  .dist-row .digit{ color:var(--chalk-dim); text-align:right; }
+  .dist-row.top .digit{ color:var(--chalk-yellow); font-weight:600; }
+
+  .dist-track{ height:6px; border-radius:3px; background:rgba(243,240,230,0.08); overflow:hidden; }
+  .dist-fill{ height:100%; width:0%; background:var(--chalk-blue); border-radius:3px; transition:width .45s ease; }
+  .dist-row.top .dist-fill{ background:var(--chalk-yellow); }
+
+  .dist-row .pct{ color:var(--chalk-dim); text-align:right; }
+
+  .error-msg{
+    color:var(--chalk-red);
+    font-size:12.5px;
+    margin-top:8px;
+    display:none;
+  }
+  .error-msg.show{ display:block; }
+
+  /* ---------- Ledger ---------- */
+
+  .ledger{
+    margin-top:26px;
+    background:rgba(243,240,230,0.03);
+    border:1px solid rgba(243,240,230,0.1);
+    border-radius:8px;
+    padding:18px 20px 6px;
+  }
+
+  .ledger h3{
+    font-family:'Caveat', cursive;
+    font-size:22px;
+    margin:0 0 12px;
+    color:var(--chalk-white);
+  }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+
+  thead th{
+    text-align:left;
+    color:var(--chalk-dim);
+    font-weight:500;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    font-size:10.5px;
+    padding-bottom:8px;
+    border-bottom:1px dashed rgba(243,240,230,0.14);
+  }
+
+  tbody td{
+    padding:9px 4px;
+    border-bottom:1px solid rgba(243,240,230,0.06);
+  }
+
+  tbody tr:last-child td{ border-bottom:none; }
+
+  .thumb{
+    width:26px; height:26px;
+    border-radius:3px;
+    background:var(--board);
+    border:1px solid rgba(243,240,230,0.15);
+  }
+
+  .empty-row td{
+    text-align:center;
+    color:var(--chalk-dim);
+    font-family:'Caveat', cursive;
+    font-size:17px;
+    padding:18px 0;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Model Inference Desk</div>
+    <h1>Chalkboard Digit Lab</h1>
+    <p>Write a numeral. The examiner grades it in real time.</p>
+  </header>
+
+  <div class="desk">
+
+    <!-- Drawing board -->
+    <div class="board-frame">
+      <div class="board-inner">
+        <canvas id="canvas" width="320" height="320" aria-label="Digit drawing canvas"></canvas>
+      </div>
+      <div class="board-caption">practice sums, section 4B</div>
+
+      <div class="tools">
+        <div class="chalk-slider">
+          <label for="brush">chalk width</label>
+          <input type="range" id="brush" min="8" max="34" value="20">
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button onclick="clearCanvas()">Erase board</button>
+        <button class="primary" id="predictBtn" onclick="predictDigit()">Submit for grading</button>
+      </div>
+    </div>
+
+    <!-- Report card -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Report card</h2>
+          <div class="status" id="statusIndicator"><span class="dot"></span><span id="statusText">checking model…</span></div>
+        </div>
+
+        <div id="verdictBlock">
+          <div class="placeholder">No submission yet — draw a digit and send it in.</div>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+      </div>
+
+      <div class="ledger">
+        <h3>Attendance log</h3>
+        <table>
+          <thead>
+            <tr><th></th><th>Time</th><th>Digit</th><th>Confidence</th></tr>
+          </thead>
+          <tbody id="ledgerBody">
+            <tr class="empty-row"><td colspan="4">the roster is empty</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const brushInput = document.getElementById("brush");
+const predictBtn = document.getElementById("predictBtn");
+const errorMsg = document.getElementById("errorMsg");
+const verdictBlock = document.getElementById("verdictBlock");
+const ledgerBody = document.getElementById("ledgerBody");
+const statusIndicator = document.getElementById("statusIndicator");
+const statusText = document.getElementById("statusText");
+
+const API_BASE = "http://127.0.0.1:8000";
+let hasInk = false;
+let ledgerEntries = [];
+
+function resetBoard(){
+  ctx.fillStyle = "transparent";
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+resetBoard();
+
+// ---------- Drawing ----------
+
+let drawing = false;
+let lastX = 0, lastY = 0;
+
+function getPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const point = e.touches ? e.touches[0] : e;
+  return {
+    x: (point.clientX - rect.left) * scaleX,
+    y: (point.clientY - rect.top) * scaleY
+  };
+}
+
+function startDraw(e){
+  e.preventDefault();
+  drawing = true;
+  hasInk = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, Number(brushInput.value)/2, 0, Math.PI*2);
+  ctx.fillStyle = "#f3f0e6";
+  ctx.fill();
+}
+
+function stopDraw(){
+  drawing = false;
+}
+
+function draw(e){
+  if(!drawing) return;
+  e.preventDefault();
+  const p = getPos(e);
+
+  ctx.lineWidth = Number(brushInput.value);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#f3f0e6";
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+
+  lastX = p.x; lastY = p.y;
+}
+
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mouseup", stopDraw);
+canvas.addEventListener("mouseleave", stopDraw);
+canvas.addEventListener("mousemove", draw);
+
+canvas.addEventListener("touchstart", startDraw, { passive:false });
+canvas.addEventListener("touchend", stopDraw);
+canvas.addEventListener("touchmove", draw, { passive:false });
+
+function clearCanvas(){
+  resetBoard();
+  hasInk = false;
+  errorMsg.classList.remove("show");
+  verdictBlock.innerHTML = `<div class="placeholder">No submission yet — draw a digit and send it in.</div>`;
+}
+
+// ---------- Model status polling ----------
+
+async function checkStatus(){
+  try{
+    const res = await fetch(`${API_BASE}/health`, { method:"GET" });
+    if(res.ok){
+      statusIndicator.className = "status online";
+      statusText.textContent = "model online";
+    } else {
+      throw new Error("bad response");
+    }
+  }catch(err){
+    statusIndicator.className = "status";
+    statusText.textContent = "model offline";
+  }
+}
+checkStatus();
+setInterval(checkStatus, 8000);
+
+// ---------- Prediction ----------
+
+function buildDistribution(probabilities, prediction){
+  const wrap = document.createElement("div");
+  wrap.className = "distribution";
+  wrap.innerHTML = `<div class="label">Full distribution</div>`;
+
+  probabilities.forEach((p, digit) => {
+    const row = document.createElement("div");
+    row.className = "dist-row" + (digit === prediction ? " top" : "");
+    const pct = (p*100).toFixed(1);
+    row.innerHTML = `
+      <div class="digit">${digit}</div>
+      <div class="dist-track"><div class="dist-fill" style="width:${pct}%"></div></div>
+      <div class="pct">${pct}%</div>
+    `;
+    wrap.appendChild(row);
+  });
+
+  return wrap;
+}
+
+function renderVerdict(prediction, confidence, probabilities){
+  verdictBlock.innerHTML = "";
+
+  const verdict = document.createElement("div");
+  verdict.className = "verdict";
+
+  const digitEl = document.createElement("div");
+  digitEl.className = "verdict-digit";
+  digitEl.textContent = prediction;
+
+  const meta = document.createElement("div");
+  meta.className = "verdict-meta";
+  meta.innerHTML = `
+    <div class="label">Confidence</div>
+    <div class="confidence-track"><div class="confidence-fill" id="confFill"></div></div>
+    <div class="confidence-pct">${(confidence*100).toFixed(2)}%</div>
+  `;
+
+  verdict.appendChild(digitEl);
+  verdict.appendChild(meta);
+  verdictBlock.appendChild(verdict);
+
+  requestAnimationFrame(() => {
+    digitEl.classList.add("show");
+    document.getElementById("confFill").style.width = `${(confidence*100).toFixed(2)}%`;
+  });
+
+  if(Array.isArray(probabilities) && probabilities.length === 10){
+    verdictBlock.appendChild(buildDistribution(probabilities, prediction));
+  }
+}
+
+function addLedgerEntry(prediction, confidence, thumbDataUrl){
+  const time = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  ledgerEntries.unshift({ time, prediction, confidence, thumbDataUrl });
+  ledgerEntries = ledgerEntries.slice(0, 8);
+
+  ledgerBody.innerHTML = "";
+  ledgerEntries.forEach(entry => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><img class="thumb" src="${entry.thumbDataUrl}" alt="digit snapshot"></td>
+      <td>${entry.time}</td>
+      <td>${entry.prediction}</td>
+      <td>${(entry.confidence*100).toFixed(1)}%</td>
+    `;
+    ledgerBody.appendChild(tr);
+  });
+}
+
+async function predictDigit(){
+  errorMsg.classList.remove("show");
+
+  if(!hasInk){
+    errorMsg.textContent = "The board is blank — write a digit first.";
+    errorMsg.classList.add("show");
+    return;
+  }
+
+  predictBtn.disabled = true;
+  predictBtn.textContent = "Grading…";
+
+  try{
+    const smallCanvas = document.createElement("canvas");
+    smallCanvas.width = 28;
+    smallCanvas.height = 28;
+    const smallCtx = smallCanvas.getContext("2d");
+    smallCtx.drawImage(canvas, 0, 0, 28, 28);
+
+    const imageData = smallCtx.getImageData(0, 0, 28, 28);
+    const pixels = [];
+    for(let i=0; i<imageData.data.length; i+=4){
+      const r = imageData.data[i];
+      const value = r / 255; // strokes are drawn in white on a transparent/black board
+      pixels.push(value);
+    }
+
+    const response = await fetch(`${API_BASE}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pixels })
+    });
+
+    if(!response.ok){
+      throw new Error(`Server responded with status ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if(result.status === "success"){
+      renderVerdict(result.prediction, result.confidence, result.probabilities);
+      addLedgerEntry(result.prediction, result.confidence, smallCanvas.toDataURL());
+    } else {
+      errorMsg.textContent = result.message || "The model could not grade this submission.";
+      errorMsg.classList.add("show");
+    }
+
+  }catch(err){
+    errorMsg.textContent = `Could not reach the model server (${err.message}). Make sure the API is running at ${API_BASE}.`;
+    errorMsg.classList.add("show");
+  }finally{
+    predictBtn.disabled = false;
+    predictBtn.textContent = "Submit for grading";
+  }
+}
+
+</script>
+
+</body>
+</html>
